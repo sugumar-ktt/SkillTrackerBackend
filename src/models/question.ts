@@ -11,6 +11,7 @@ class Question extends Model<InferAttributes<Question>, InferCreationAttributes<
 	declare score: number;
 	declare type: QuestionTypeEnum;
 	declare AssesmentId?: number;
+	declare snippet: Snippet;
 
 	associate(models: Models) {
 		Question.belongsTo(models.Assesment, { foreignKey: { field: "AssesmentId" } });
@@ -20,8 +21,13 @@ class Question extends Model<InferAttributes<Question>, InferCreationAttributes<
 export type Choice = {
 	id: string;
 	text: string;
+	number: number;
 };
 
+export type Snippet = {
+	code: string;
+	language: string;
+}
 export type QuestionTypeEnum = "mcq" | "coding";
 
 Question.init(
@@ -40,6 +46,10 @@ Question.init(
 		answer: {
 			type: DataTypes.JSONB,
 			defaultValue: {} as Choice
+		},
+		snippet: {
+			type: DataTypes.JSONB,
+			defaultValue: {} as Snippet
 		},
 		score: DataTypes.DECIMAL,
 		type: {
