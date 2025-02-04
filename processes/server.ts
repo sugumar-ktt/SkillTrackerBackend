@@ -13,6 +13,7 @@ try {
 } catch (error) {
 	if (error instanceof Error) {
 		logger.error("Error in database connection", error.message);
+		logger.error(error);
 	}
 }
 

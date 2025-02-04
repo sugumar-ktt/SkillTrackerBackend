@@ -1,5 +1,5 @@
-import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
 import sequelize from "$config/db";
+import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
 import type { Models } from "./types";
 
 export class AssesmentAttempt extends Model<InferAttributes<AssesmentAttempt>, InferCreationAttributes<AssesmentAttempt>> {
@@ -15,6 +15,7 @@ export class AssesmentAttempt extends Model<InferAttributes<AssesmentAttempt>, I
 		this.belongsTo(models.Session, { foreignKey: { field: "SessionId" } });
 		this.belongsTo(models.Candidate, { foreignKey: { field: "CandidateId" } });
 		this.belongsTo(models.Assesment, { foreignKey: { field: "AssesmentId" } });
+		this.hasMany(models.AssesmentAttemptDetail);
 	}
 }
 

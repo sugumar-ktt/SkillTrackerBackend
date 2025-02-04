@@ -28,9 +28,9 @@ export class AssesmentService {
 				return { error: AppError.validation("Assesment has expired") };
 			}
 
-			if (!currentTime.isAfter(startTime)) {
-				return { error: AppError.validation("Assesment has not started yet") };
-			}
+			// if (!currentTime.isAfter(startTime)) {
+			// 	return { error: AppError.validation("Assesment has not started yet") };
+			// }
 
 			const Session = await models.Session.findByPk(sessionId, {
 				attributes: ["id", "CandidateId", "expiresAt"]

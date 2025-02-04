@@ -7,7 +7,7 @@ class Assesment extends Model<InferAttributes<Assesment>, InferCreationAttribute
 	declare name: string;
 	declare startDate: string;
 	declare endDate: string;
-	declare questions: number;
+	declare questions?: number;
 	declare CollegeId: number;
 	static associate(models: Models) {
 		Assesment.belongsTo(models.College, { foreignKey: { field: "CollegeId" } });
@@ -28,7 +28,10 @@ Assesment.init(
 		},
 		startDate: DataTypes.DATE,
 		endDate: DataTypes.DATE,
-		questions: DataTypes.INTEGER,
+		questions: {
+			type: DataTypes.INTEGER,
+			defaultValue: 0
+		},
 		CollegeId: DataTypes.INTEGER
 	},
 	{

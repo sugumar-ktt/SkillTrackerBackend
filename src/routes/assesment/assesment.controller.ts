@@ -1,6 +1,6 @@
 import logger from "$src/lib/logger";
 import { responses, type StatusCode } from "$src/lib/utils/controller";
-import { models } from "$src/models";
+import { models, type ModelInstances } from "$src/models";
 import type Session from "$src/models/session";
 import { AssesmentService } from "$src/services/assesment";
 import dayjs from "dayjs";
@@ -46,17 +46,31 @@ export const startAssesment = async (req: Request, res: Response, next: NextFunc
 	}
 };
 
-export const getAssesmentAttemptById = async (req: Request, res: Response, next: NextFunction) => {
+export const getAssesmentBySession = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const assesmentAttemptIdParam = req.params.assesmentAttemptId as string | undefined;
-		if (!assesmentAttemptIdParam) {
+		const assesmentIdParam = req.params.id as string | undefined;
+
+		if (!assesmentIdParam) {
 			responses.send(res, responses.badRequest("Assesment identifier is required in the URL path"));
 			return;
 		}
 
-		const assesmentAttemptId = parseInt(assesmentAttemptIdParam);
-		const AssesmentAttempt = await models.AssesmentAttempt.findByPk(assesmentAttemptId, {
-			attributes: ["id", "startTime", "endTime", "status"]
+		const assesmentId = parseInt(assesmentIdParam);
+		const session = res.locals.session as ModelInstances["Session"];
+
+		const AssesmentAttempt = await models.AssesmentAttempt.findOne({
+			attributes: ["id", "startTime", "endTime", "status"],
+			include: [
+				{
+					model: models.AssesmentAttemptDetail,
+					attributes: ["id"]
+				}
+			],
+			where: {
+				SessionId: session.id,
+				CandidateId: session.CandidateId,
+				AssesmentId: assesmentId
+			}
 		});
 		responses.send(res, responses.success(AssesmentAttempt));
 	} catch (error) {
