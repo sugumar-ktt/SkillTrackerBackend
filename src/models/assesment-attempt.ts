@@ -1,25 +1,27 @@
 import sequelize from "$config/db";
 import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
-import type { Models } from "./types";
+import type { ModelInstances, Models } from "./types";
 
-export class AssesmentAttempt extends Model<InferAttributes<AssesmentAttempt>, InferCreationAttributes<AssesmentAttempt>> {
+export class AssessmentAttempt extends Model<InferAttributes<AssessmentAttempt>, InferCreationAttributes<AssessmentAttempt>> {
 	declare id?: number;
 	declare startTime?: string;
 	declare endTime?: string;
 	declare status?: "Draft" | "InProgress" | "Completed";
 	declare SessionId: number;
 	declare CandidateId: number;
-	declare AssesmentId: number;
+	declare AssessmentId: number;
+	declare Assessment?: ModelInstances["Assessment"];
+	declare AssessmentAttemptDetails?: () => ModelInstances["AssessmentAttemptDetail"][];
 
 	static associate(models: Models) {
 		this.belongsTo(models.Session, { foreignKey: { field: "SessionId" } });
 		this.belongsTo(models.Candidate, { foreignKey: { field: "CandidateId" } });
-		this.belongsTo(models.Assesment, { foreignKey: { field: "AssesmentId" } });
-		this.hasMany(models.AssesmentAttemptDetail);
+		this.belongsTo(models.Assessment, { foreignKey: { field: "AssessmentId" } });
+		this.hasMany(models.AssessmentAttemptDetail);
 	}
 }
 
-AssesmentAttempt.init(
+AssessmentAttempt.init(
 	{
 		id: {
 			type: DataTypes.INTEGER,
@@ -39,7 +41,7 @@ AssesmentAttempt.init(
 			defaultValue: "Draft"
 		},
 		SessionId: DataTypes.INTEGER,
-		AssesmentId: DataTypes.INTEGER,
+		AssessmentId: DataTypes.INTEGER,
 		CandidateId: DataTypes.INTEGER
 	},
 	{
@@ -47,4 +49,4 @@ AssesmentAttempt.init(
 	}
 );
 
-export default AssesmentAttempt;
+export default AssessmentAttempt;

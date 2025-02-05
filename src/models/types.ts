@@ -1,11 +1,12 @@
-import Assesment from "./assesment";
-import AssesmentAttempt from "./assesment-attempt";
-import AssesmentAttemptDetail from "./assesment-attempt-detail";
+import Assessment from "./assesment";
+import AssessmentAttempt from "./assesment-attempt";
+import AssessmentAttemptDetail from "./assesment-attempt-detail";
 import Candidate from "./candidate";
 import College from "./college";
 import Department from "./department";
 import Question from "./question";
 import Session from "./session";
+import Submission from "./submission";
 
 interface Associateable {
 	associate?: (models: Models) => void;
@@ -19,11 +20,12 @@ const models = {
 	Candidate: extendModel(Candidate),
 	Session: extendModel(Session),
 	Department: extendModel(Department),
-	Assesment: extendModel(Assesment),
+	Assessment: extendModel(Assessment),
 	Question: extendModel(Question),
-	AssesmentAttempt: extendModel(AssesmentAttempt),
-	AssesmentAttemptDetail: extendModel(AssesmentAttemptDetail),
-	College: extendModel(College)
+	AssessmentAttempt: extendModel(AssessmentAttempt),
+	AssessmentAttemptDetail: extendModel(AssessmentAttemptDetail),
+	College: extendModel(College),
+	Submission: extendModel(Submission)
 };
 
 export type Models = {

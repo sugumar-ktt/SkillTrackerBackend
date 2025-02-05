@@ -1,21 +1,23 @@
 import sequelize from "$config/db";
 import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
-import type { Models } from "./types";
+import type { ModelInstances, Models } from "./types";
 
-class Assesment extends Model<InferAttributes<Assesment>, InferCreationAttributes<Assesment>> {
+class Assessment extends Model<InferAttributes<Assessment>, InferCreationAttributes<Assessment>> {
 	declare id: number;
 	declare name: string;
 	declare startDate: string;
 	declare endDate: string;
+	declare maxAttempts?: number;
 	declare questions?: number;
 	declare CollegeId: number;
 	static associate(models: Models) {
-		Assesment.belongsTo(models.College, { foreignKey: { field: "CollegeId" } });
-		Assesment.hasMany(models.Candidate);
+		Assessment.belongsTo(models.College, { foreignKey: { field: "CollegeId" } });
+		Assessment.hasMany(models.Candidate);
+		Assessment.hasMany(models.AssessmentAttempt);
 	}
 }
 
-Assesment.init(
+Assessment.init(
 	{
 		id: {
 			type: DataTypes.INTEGER,
@@ -32,6 +34,10 @@ Assesment.init(
 			type: DataTypes.INTEGER,
 			defaultValue: 0
 		},
+		maxAttempts: {
+			type: DataTypes.INTEGER,
+			defaultValue: 1
+		},
 		CollegeId: DataTypes.INTEGER
 	},
 	{
@@ -39,4 +45,4 @@ Assesment.init(
 	}
 );
 
-export default Assesment;
+export default Assessment;

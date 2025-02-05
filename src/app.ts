@@ -8,7 +8,7 @@ import appConfig from "$config/app";
 import userRouter from "./routes/user/user.route";
 import departmentRouter from "./routes/department/department.route";
 import cookieParser from "cookie-parser";
-import assesmentRouter from "./routes/assesment/assesment.route";
+import assessmentRouter from "./routes/assesment/assesment.route";
 import candidateRouter from "./routes/candidate/candidate.routes";
 
 const app = express();
@@ -35,7 +35,7 @@ app.use(compression());
 
 app.use("/api/users", userRouter);
 app.use("/api/departments", departmentRouter);
-app.use("/api/assesments", assesmentRouter);
+app.use("/api/assessments", assessmentRouter);
 app.use("/api/candidates", candidateRouter);
 
 const typedHandler = errorHandler as unknown as ErrorRequestHandler;

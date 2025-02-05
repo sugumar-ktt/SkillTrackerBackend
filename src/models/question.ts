@@ -10,11 +10,11 @@ class Question extends Model<InferAttributes<Question>, InferCreationAttributes<
 	declare answer?: Choice;
 	declare score: number;
 	declare type: QuestionTypeEnum;
-	declare AssesmentId?: number;
-	declare snippet: Snippet;
+	declare snippet?: Snippet;
+	declare AssessmentId?: number;
 
 	associate(models: Models) {
-		Question.belongsTo(models.Assesment, { foreignKey: { field: "AssesmentId" } });
+		Question.belongsTo(models.Assessment, { foreignKey: { field: "AssessmentId" } });
 	}
 }
 
@@ -27,7 +27,8 @@ export type Choice = {
 export type Snippet = {
 	code: string;
 	language: string;
-}
+};
+
 export type QuestionTypeEnum = "mcq" | "coding";
 
 Question.init(
@@ -58,7 +59,7 @@ Question.init(
 				isIn: [["mcq", "coding"]] satisfies QuestionTypeEnum[][]
 			}
 		},
-		AssesmentId: DataTypes.INTEGER
+		AssessmentId: DataTypes.INTEGER
 	},
 	{
 		sequelize: sequelize
