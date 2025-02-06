@@ -1,8 +1,11 @@
 import sequelize from "$config/db";
-import { AppError } from "$src/lib/errors";
+import { AssessmentIntegrity } from "$src/lib/constants";
+import { AppError, type ErrorContext } from "$src/lib/errors";
 import logger from "$src/lib/logger";
 import { getRandRange } from "$src/lib/utils";
 import { models, type ModelInstances } from "$src/models";
+import type { QuestionTypeEnum } from "$src/models/question";
+import type { ProctoringInformation } from "$src/types";
 import dayjs from "dayjs";
 import { Op } from "sequelize";
 
@@ -17,38 +20,28 @@ export class AssessmentService {
 	static async startAssesstment(assesmentId: number, sessionId: number) {
 		try {
 			const Assessment = await models.Assessment.findOne({
-				attributes: ["id", "name", "startDate", "endDate", "questions"],
-				where: {
-					id: assesmentId
-				}
+				attributes: ["id", "name", "startDate", "endDate", "questions", "questionDistribution"],
+				where: { id: assesmentId }
 			});
 
 			if (!Assessment) {
-				return { error: AppError.notFound("Assessment not found") };
+				throw AppError.notFound("Assessment not found");
 			}
 
-			const endTime = dayjs(Assessment.endDate);
 			const startTime = dayjs(Assessment.startDate);
-			const currentTime = dayjs();
-
-			if (!currentTime.isBefore(endTime)) {
-				return { error: AppError.validation("Assessment has expired") };
+			const { error, result } = await AssessmentService.validateAssesmentTime(Assessment);
+			if (error) {
+				throw AppError.validation(error.message);
 			}
-
-			// if (!currentTime.isAfter(startTime)) {
-			// 	return { error: AppError.validation("Assessment has not started yet") };
-			// }
 
 			const Session = await models.Session.findByPk(sessionId, {
 				attributes: ["id", "CandidateId", "expiresAt"]
 			});
-
 			if (!Session) {
-				return { error: AppError.validation("Candidate not found") };
+				throw AppError.validation("Candidate not found");
 			}
-
 			if (dayjs(Session.expiresAt).isBefore(dayjs())) {
-				return { error: AppError.validation("Session expired") };
+				throw AppError.validation("Session expired");
 			}
 
 			const ExistingAssessmentAttempt = await models.AssessmentAttempt.findOne({
@@ -61,12 +54,14 @@ export class AssessmentService {
 					CandidateId: Session.CandidateId
 				}
 			});
-
 			if (ExistingAssessmentAttempt) {
-				return { error: AppError.badRequest("Existing attempt for the test is in progress. Resume the attempt to proceed") };
+				throw AppError.badRequest("Existing attempt for the test is in progress. Resume the session to proceed");
 			}
 
 			const { AssessmentAttempt, AssessmentAttemptDetails } = await sequelize.transaction(async (t) => {
+				const questionsByType: Record<QuestionTypeEnum, ModelInstances["Question"][]> = { coding: [], mcq: [] };
+				const questionDistribution = Assessment.questionDistribution;
+
 				const AssessmentAttempt = await models.AssessmentAttempt.create(
 					{
 						startTime: dayjs().toISOString(),
@@ -76,19 +71,38 @@ export class AssessmentService {
 					},
 					{ transaction: t }
 				);
+
 				const Questions = await models.Question.findAll({
-					attributes: ["id", "score"]
+					attributes: ["id", "score", "type"]
 				});
-				const { result: ShuffledQuestions, error } = AssessmentService.shuffleQuestions(Questions, Assessment.questions || 0);
-				if (error) {
-					throw AppError.internal("Error while shuffling questions");
+				for (const Question of Questions) {
+					questionsByType[Question.type].push(Question);
 				}
+
+				const ShuffledQuestions: ModelInstances["Question"][] = [];
+				for (const [type, count] of Object.entries(questionDistribution)) {
+					if (!(type === "mcq" || type === "coding")) continue;
+					const questions = questionsByType[type];
+					const { result, error } = AssessmentService.shuffleQuestions(questions, count);
+					if (error) {
+						throw AppError.internal("Error while shuffling questions");
+					}
+					ShuffledQuestions.push(...result);
+				}
+
+				ShuffledQuestions.sort((a, b) => {
+					if (a.type === "coding" && b.type !== "coding") return 1;
+					if (b.type === "coding" && a.type !== "coding") return -1;
+					return 0;
+				});
+
 				const AssessmentAttemptDetails = await Promise.all(
-					ShuffledQuestions.map(async (question) => {
+					ShuffledQuestions.map(async (question, index) => {
 						const AssessmentAttemptDetail = await models.AssessmentAttemptDetail.create(
 							{
 								AssessmentAttemptId: AssessmentAttempt.id as number,
-								QuestionId: question.id as number
+								QuestionId: question.id as number,
+								order: index + 1
 							},
 							{ transaction: t }
 						);
@@ -99,39 +113,43 @@ export class AssessmentService {
 			});
 			return { result: { AssessmentAttempt, AssessmentAttemptDetails } };
 		} catch (error) {
-			logger.error("Error in starting assesment", error);
-			return {
-				error: AppError.internal("Error in starting assesment", {
-					cause: error instanceof Error ? error : undefined,
-					service: "Assessment",
-					operation: "startAssessment"
-				})
+			const errorContext: ErrorContext = {
+				cause: error instanceof Error ? error : undefined,
+				service: "Assessment",
+				operation: "startAssessment"
 			};
+			const normalizedError =
+				error instanceof AppError ? error.addContext(errorContext) : AppError.internal("Error starting assessment", errorContext);
+
+			logger.error(normalizedError);
+			return { error: normalizedError };
 		}
 	}
 
 	static shuffleQuestions(questions: ModelInstances["Question"][], count: number) {
 		try {
 			if (questions.length < count) {
-				return { error: AppError.validation("Question set is less than the requested count") };
+				throw AppError.validation("Question set is less than the requested count");
 			}
-
 			// Fisher-Yates shuffle
 			for (let i = questions.length - 1; i > 0; i--) {
 				const j = getRandRange(0, i);
 				[questions[i], questions[j]] = [questions[j], questions[i]];
 			}
-
 			return { result: questions.slice(0, count) };
 		} catch (error) {
-			logger.error("Error in shuffling questions", error);
-			return {
-				error: AppError.internal("Error in shuffling questions", {
-					cause: error instanceof Error ? error : undefined,
-					service: "Assessment",
-					operation: "shuffleQuestions"
-				})
+			const errorContext: ErrorContext = {
+				cause: error instanceof Error ? error : undefined,
+				service: "Assessment",
+				operation: "shuffleQuestions"
 			};
+			const normalizedError =
+				error instanceof AppError
+					? error.addContext(errorContext)
+					: AppError.internal("Error in shuffling questions", errorContext);
+
+			logger.error(normalizedError);
+			return { error: normalizedError };
 		}
 	}
 
@@ -155,17 +173,20 @@ export class AssessmentService {
 					CandidateId: candidate.id
 				}
 			});
-
 			return { result: ActiveAssessmentAttempt?.Assessment };
 		} catch (error) {
-			logger.error("Error while fetching active assesment", error);
-			return {
-				error: AppError.internal("Error while fetching active assesment", {
-					cause: error instanceof Error ? error : undefined,
-					service: "Assessment",
-					operation: "getActiveAssessmentForCandidate"
-				})
+			const errorContext: ErrorContext = {
+				cause: error instanceof Error ? error : undefined,
+				service: "Assessment",
+				operation: "getActiveAssessmentForCandidate"
 			};
+			const normalizedError =
+				error instanceof AppError
+					? error.addContext(errorContext)
+					: AppError.internal("Error fetching active assessment", errorContext);
+
+			logger.error(normalizedError);
+			return { error: normalizedError };
 		}
 	}
 
@@ -174,11 +195,9 @@ export class AssessmentService {
 			if (!candidate.id) {
 				throw AppError.internal("Candidate ID is missing");
 			}
-
 			if (!assesment.id) {
 				throw AppError.internal("Assessment ID is missing");
 			}
-
 			const ActiveAssessmentAttempt = await models.AssessmentAttempt.findOne({
 				attributes: ["id", "startTime", "endTime", "status", "AssessmentId"],
 				where: {
@@ -189,56 +208,58 @@ export class AssessmentService {
 					CandidateId: candidate.id
 				}
 			});
-
 			if (!ActiveAssessmentAttempt) {
-				return { error: AppError.notFound("No active attempts found for the assesment") };
+				throw AppError.notFound("No active attempts found for the assesment");
 			}
-
 			return { result: ActiveAssessmentAttempt };
 		} catch (error) {
-			logger.error("Error while fetching active assesment attempt", error);
-			return {
-				error: AppError.internal("Error while fetching active assesment attempt", {
-					cause: error instanceof Error ? error : undefined,
-					service: "Assessment",
-					operation: "getActiveAttempt"
-				})
+			const errorContext: ErrorContext = {
+				cause: error instanceof Error ? error : undefined,
+				service: "Assessment",
+				operation: "getActiveAttempt"
 			};
+			const normalizedError =
+				error instanceof AppError
+					? error.addContext(errorContext)
+					: AppError.internal("Error fetching active assessment attempt", errorContext);
+
+			logger.error(normalizedError);
+			return { error: normalizedError };
 		}
 	}
 
-	static async validateAssesmentTime(assesment: ModelInstances["Assessment"]) {
+	static async validateAssesmentTime(assesment: ModelInstances["Assessment"], time = dayjs()) {
 		try {
 			if (!assesment.startDate) {
 				throw AppError.internal("Assessment start time is missing");
 			}
-
 			if (!assesment.endDate) {
 				throw AppError.internal("Assessment end time is missing");
 			}
 
 			const assesmentStartTime = dayjs(assesment.startDate);
 			const assesmentEndTime = dayjs(assesment.endDate);
-			const currentTime = dayjs();
 
-			if (currentTime.isBefore(assesmentStartTime)) {
+			if (time.isBefore(assesmentStartTime)) {
 				throw AppError.validation("Assessment has not started yet");
 			}
-
-			if (currentTime.isAfter(assesmentEndTime)) {
+			if (time.isAfter(assesmentEndTime)) {
 				throw AppError.validation("Assessment has ended");
 			}
-
 			return { result: true };
 		} catch (error) {
-			logger.error("Error while validating assessment time", error);
-			return {
-				error: AppError.internal("Error while validating assessment time", {
-					cause: error instanceof Error ? error : undefined,
-					service: "Assessment",
-					operation: "validateAssesmentTime"
-				})
+			const errorContext: ErrorContext = {
+				cause: error instanceof Error ? error : undefined,
+				service: "Assessment",
+				operation: "validateAssesmentTime"
 			};
+			const normalizedError =
+				error instanceof AppError
+					? error.addContext(errorContext)
+					: AppError.internal("Error while validating assesment time", errorContext);
+
+			logger.error(normalizedError);
+			return { error: normalizedError };
 		}
 	}
 
@@ -247,22 +268,18 @@ export class AssessmentService {
 			if (!AssessmentAttempt) {
 				throw AppError.internal("Attempt information missing");
 			}
-
 			if (!Candidate) {
 				throw AppError.internal("Candidate information missing");
 			}
-
 			if (!Session) {
 				throw AppError.internal("Session information missing");
 			}
-
 			if (!completionTime) {
 				throw AppError.internal("Completion time of the assessment is required");
 			}
 
 			const Submission = await sequelize.transaction(async (t) => {
 				await AssessmentAttempt.reload({ transaction: t });
-
 				await AssessmentAttempt.update(
 					{
 						endTime: dayjs(completionTime),
@@ -273,9 +290,7 @@ export class AssessmentService {
 
 				const AssessmentAttemptDetails = await models.AssessmentAttemptDetail.findAll({
 					attributes: ["id", "isAttempted", "isCorrect", "submission", "score"],
-					where: {
-						AssessmentAttemptId: AssessmentAttempt.id
-					},
+					where: { AssessmentAttemptId: AssessmentAttempt.id },
 					transaction: t
 				});
 
@@ -293,6 +308,7 @@ export class AssessmentService {
 						attemptedQuestions += 1;
 					}
 				}
+
 				const Submission = await models.Submission.create({
 					duration: asssessmentDuration,
 					totalScore: Math.round(totalScore),
@@ -303,20 +319,60 @@ export class AssessmentService {
 					SessionId: Session.id as number,
 					submittedAt: dayjs().toISOString()
 				});
-
 				return Submission;
 			});
-
 			return { result: Submission };
 		} catch (error) {
-			logger.error("Error while creating assesment submission", error);
-			return {
-				error: AppError.internal("Error while creating assesment submission", {
-					cause: error instanceof Error ? error : undefined,
-					service: "Assessment",
-					operation: "createSubmission"
-				})
+			const errorContext: ErrorContext = {
+				cause: error instanceof Error ? error : undefined,
+				service: "Assessment",
+				operation: "createSubmission"
 			};
+			const normalizedError =
+				error instanceof AppError
+					? error.addContext(errorContext)
+					: AppError.internal("Error creating assessment submission", errorContext);
+
+			logger.error(normalizedError);
+			return { error: normalizedError };
+		}
+	}
+
+	static async updateProctoringInformation(AssessmentAttempt: ModelInstances["AssessmentAttempt"]) {
+		try {
+			if (!AssessmentAttempt.id) {
+				throw AppError.internal("Attempt identifier is missing");
+			}
+
+			let integrity = AssessmentAttempt.integrity;
+			const proctoring = AssessmentAttempt.proctoring || {};
+
+			const visibilityChanges = proctoring.visibilityChanges || 0;
+			const fullScreenExits = proctoring.fullScreenExits || 0;
+			if (!proctoring.isAssessmentConsentProvided) {
+				integrity = AssessmentIntegrity.PermissionDeclined;
+			} else if (proctoring.isFullScreenAccessProvided == false || visibilityChanges >= 10 || fullScreenExits >= 10) {
+				integrity = AssessmentIntegrity.Bad;
+			} else {
+				integrity = AssessmentIntegrity.Good;
+			}
+
+			await AssessmentAttempt.update({ proctoring: { ...proctoring }, integrity });
+
+			return { result: AssessmentAttempt };
+		} catch (error) {
+			const errorContext: ErrorContext = {
+				cause: error instanceof Error ? error : undefined,
+				service: "Assessment",
+				operation: "updateProctoringInformation"
+			};
+			const normalizedError =
+				error instanceof AppError
+					? error.addContext(errorContext)
+					: AppError.internal("Error updating proctoring details", errorContext);
+
+			logger.error(normalizedError);
+			return { error: normalizedError };
 		}
 	}
 }

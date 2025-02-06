@@ -1,17 +1,19 @@
-import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
 import sequelize from "$config/db";
+import type { CodingChoice } from "$src/types";
+import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
+import type { MCQChoice } from "./question";
 import type { ModelInstances, Models } from "./types";
-import type { Choice } from "./question";
 
 export class AssessmentAttemptDetail extends Model<
 	InferAttributes<AssessmentAttemptDetail>,
 	InferCreationAttributes<AssessmentAttemptDetail>
 > {
 	declare id?: number;
+	declare order?: number;
 	declare isAttempted?: boolean;
 	declare isCorrect?: boolean;
 	declare changeCount?: number;
-	declare submission?: Partial<Choice>;
+	declare submission?: Partial<MCQChoice | CodingChoice>;
 	declare score?: number;
 	declare reviewerFeedback?: string;
 	declare gradedAt?: string;
@@ -45,9 +47,13 @@ AssessmentAttemptDetail.init(
 			type: DataTypes.INTEGER,
 			defaultValue: 0
 		},
+		order: {
+			type: DataTypes.INTEGER,
+			defaultValue: 0
+		},
 		submission: {
 			type: DataTypes.JSONB,
-			defaultValue: {} as Choice
+			defaultValue: {} as MCQChoice
 		},
 		score: {
 			type: DataTypes.DECIMAL,

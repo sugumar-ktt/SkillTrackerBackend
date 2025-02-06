@@ -1,16 +1,15 @@
-import { createLogger, format, transports } from "winston";
+import pino from "pino";
 
-const { combine, timestamp, printf, colorize } = format;
-
-const devFormat = printf(({ timestamp, level, message, ...meta }) => {
-	const metaString = Object.keys(meta).length ? JSON.stringify(meta, null, 2) : "";
-	return `${timestamp} ${level}: ${message} ${metaString}`;
-});
-
-const logger = createLogger({
+const logger = pino({
 	level: "debug",
-	format: combine(colorize(), timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), devFormat),
-	transports: [new transports.Console()]
+	transport: {
+		target: "pino-pretty",
+		options: {
+			colorize: true,
+			translateTime: "yyyy-mm-dd HH:MM:ss",
+			ignore: "pid,hostname"
+		}
+	}
 });
 
 export default logger;

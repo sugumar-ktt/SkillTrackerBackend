@@ -10,7 +10,9 @@ assessmentRouter.get("/active", bearerAuth, controller.getActiveAssessment);
 assessmentRouter.get("/:id/attempts/active", bearerAuth, controller.getActiveAttemptForAssessment);
 assessmentRouter.get("/", bearerAuth, controller.getAssessments);
 
+assessmentRouter.patch("/attempts/:attemptId/proctoring", controller.updateProctoringInformation);
 assessmentRouter.patch("/:id/attempt-details/:attemptDetailId", controller.updateAttemptDetail);
+
 assessmentRouter.post("/:id/complete", bearerAuth, controller.completeAssesment);
 assessmentRouter.post("/:id/start", bearerAuth, controller.startAssessment);
 

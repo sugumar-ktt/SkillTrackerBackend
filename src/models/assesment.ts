@@ -1,6 +1,11 @@
 import sequelize from "$config/db";
 import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
-import type { ModelInstances, Models } from "./types";
+import type { QuestionTypeEnum } from "./question";
+import type { Models } from "./types";
+
+export type QuestionDistribution = {
+	[key in QuestionTypeEnum]: number;
+};
 
 class Assessment extends Model<InferAttributes<Assessment>, InferCreationAttributes<Assessment>> {
 	declare id: number;
@@ -10,6 +15,7 @@ class Assessment extends Model<InferAttributes<Assessment>, InferCreationAttribu
 	declare maxAttempts?: number;
 	declare questions?: number;
 	declare CollegeId: number;
+	declare questionDistribution: Partial<QuestionDistribution>;
 	static associate(models: Models) {
 		Assessment.belongsTo(models.College, { foreignKey: { field: "CollegeId" } });
 		Assessment.hasMany(models.Candidate);
@@ -33,6 +39,10 @@ Assessment.init(
 		questions: {
 			type: DataTypes.INTEGER,
 			defaultValue: 0
+		},
+		questionDistribution: {
+			type: DataTypes.JSONB,
+			defaultValue: {} as QuestionDistribution
 		},
 		maxAttempts: {
 			type: DataTypes.INTEGER,

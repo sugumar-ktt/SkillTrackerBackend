@@ -6,8 +6,8 @@ export interface ErrorUser {
 }
 
 export interface ErrorContext {
-	code: number;
-	message: string;
+	code?: number;
+	message?: string;
 	timestamp?: Date;
 	operation?: string;
 	service?: string;

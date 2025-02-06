@@ -1,13 +1,14 @@
 import sequelize from "$config/db";
 import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
 import type { Models } from "./types";
+import type { CodingChoice } from "$src/types";
 
 class Question extends Model<InferAttributes<Question>, InferCreationAttributes<Question>> {
 	declare id?: number;
 	declare description: string;
 	declare hint: string | null;
-	declare choices: Choice[];
-	declare answer?: Choice;
+	declare choices: MCQChoice[] | CodingChoice[];
+	declare answer?: MCQChoice | CodingChoice;
 	declare score: number;
 	declare type: QuestionTypeEnum;
 	declare snippet?: Snippet;
@@ -18,10 +19,9 @@ class Question extends Model<InferAttributes<Question>, InferCreationAttributes<
 	}
 }
 
-export type Choice = {
+export type MCQChoice = {
 	id: string;
 	text: string;
-	number: number;
 };
 
 export type Snippet = {
@@ -42,11 +42,11 @@ Question.init(
 		hint: DataTypes.TEXT,
 		choices: {
 			type: DataTypes.JSONB,
-			defaultValue: [] satisfies Array<Choice>
+			defaultValue: [] satisfies Array<MCQChoice | CodingChoice>
 		},
 		answer: {
 			type: DataTypes.JSONB,
-			defaultValue: {} as Choice
+			defaultValue: {} as MCQChoice | CodingChoice
 		},
 		snippet: {
 			type: DataTypes.JSONB,

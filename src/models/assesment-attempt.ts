@@ -1,6 +1,8 @@
 import sequelize from "$config/db";
 import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
 import type { ModelInstances, Models } from "./types";
+import type { ProctoringInformation } from "$src/types";
+import { AssessmentIntegrity } from "$src/lib/constants";
 
 export class AssessmentAttempt extends Model<InferAttributes<AssessmentAttempt>, InferCreationAttributes<AssessmentAttempt>> {
 	declare id?: number;
@@ -11,6 +13,8 @@ export class AssessmentAttempt extends Model<InferAttributes<AssessmentAttempt>,
 	declare CandidateId: number;
 	declare AssessmentId: number;
 	declare Assessment?: ModelInstances["Assessment"];
+	declare proctoring?: Partial<ProctoringInformation>;
+	declare integrity?: AssessmentIntegrity;
 	declare AssessmentAttemptDetails?: () => ModelInstances["AssessmentAttemptDetail"][];
 
 	static associate(models: Models) {
@@ -39,6 +43,14 @@ AssessmentAttempt.init(
 			type: DataTypes.ENUM("Draft", "InProgress", "Completed"),
 			allowNull: false,
 			defaultValue: "Draft"
+		},
+		proctoring: {
+			type: DataTypes.JSONB,
+			defaultValue: {} as ProctoringInformation
+		},
+		integrity: {
+			type: DataTypes.STRING,
+			defaultValue: AssessmentIntegrity.Good
 		},
 		SessionId: DataTypes.INTEGER,
 		AssessmentId: DataTypes.INTEGER,

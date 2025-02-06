@@ -1,9 +1,11 @@
+import { ProctoringEvents } from "$src/lib/constants";
 import logger from "$src/lib/logger";
 import { responses, type StatusCode } from "$src/lib/utils/controller";
 import { models, type ModelInstances } from "$src/models";
-import type { Choice } from "$src/models/question";
+import type { MCQChoice } from "$src/models/question";
 import type Session from "$src/models/session";
 import { AssessmentService } from "$src/services/assesment";
+import type { CodingChoice } from "$src/types";
 import dayjs from "dayjs";
 import type { NextFunction, Request, Response } from "express";
 import { Op } from "sequelize";
@@ -70,6 +72,82 @@ export const startAssessment = async (req: Request, res: Response, next: NextFun
 	}
 };
 
+type UpdateProctoringInformationPayload = {
+	isFullScreenAccessProvided: boolean;
+	isAssessmentConsentProvided: boolean;
+	event: ProctoringEvents;
+};
+export const updateProctoringInformation = async (req: Request, res: Response, next: NextFunction) => {
+	try {
+		const attemptIdParam = req.params.attemptId as string | undefined;
+
+		if (!attemptIdParam) {
+			responses.send(res, responses.badRequest("Attempt identifier is missing"));
+			return;
+		}
+
+		const attemptId = parseInt(attemptIdParam);
+		const AssessmentAttempt = await models.AssessmentAttempt.findByPk(attemptId, {
+			attributes: ["id", "startTime", "endTime", "status", "proctoring", "integrity"],
+			include: [
+				{
+					model: models.Assessment,
+					attributes: ["id", "name", "startDate", "endDate"]
+				}
+			]
+		});
+
+		if (!AssessmentAttempt) {
+			responses.send(res, responses.notFound("Assessment attempt not found"));
+			return;
+		}
+
+		if (!AssessmentAttempt.Assessment) {
+			responses.send(res, responses.notFound("Assessment not found"));
+			return;
+		}
+
+		const { error: timeValidationError, result: isTimeValid } = await AssessmentService.validateAssesmentTime(
+			AssessmentAttempt.Assessment
+		);
+		if (timeValidationError) {
+			responses.send(res, responses.error(timeValidationError.context.code as StatusCode, timeValidationError.message));
+			return;
+		}
+
+		const { event, isAssessmentConsentProvided, isFullScreenAccessProvided } = req.body as UpdateProctoringInformationPayload;
+		const proctoring = AssessmentAttempt.proctoring || {};
+		const { fullScreenExits = 0, visibilityChanges = 0 } = proctoring;
+		if (event) {
+			switch (event) {
+				case ProctoringEvents.FullScreenExit:
+					proctoring.fullScreenExits = fullScreenExits + 1;
+					break;
+				case ProctoringEvents.VisibilityExit:
+					proctoring.visibilityChanges = visibilityChanges + 1;
+					break;
+				case ProctoringEvents.VisibilityEnter:
+					proctoring.visibilityChanges = visibilityChanges + 1;
+					break;
+			}
+		}
+
+		AssessmentAttempt.proctoring = { ...proctoring, isAssessmentConsentProvided, isFullScreenAccessProvided };
+
+		const { error, result } = await AssessmentService.updateProctoringInformation(AssessmentAttempt);
+
+		if (error) {
+			responses.send(res, responses.error(error.context.code as StatusCode, error.message));
+			return;
+		}
+
+		responses.send(res, responses.success(result));
+	} catch (error) {
+		logger.error(error, "Error updating proctoring information");
+		next(error);
+	}
+};
+
 type UpdateAttemptDetailPayload = {
 	answerId?: string;
 };
@@ -127,11 +205,11 @@ export const updateAttemptDetail = async (req: Request, res: Response, next: Nex
 		}
 
 		const Assessment = AttemptDetail.AssessmentAttempt?.Assessment as ModelInstances["Assessment"];
-		// const { error: timeValidationError, result: isTimeValid } = await AssessmentService.validateAssesmentTime(Assessment);
-		// if (timeValidationError) {
-		// 	responses.send(res, responses.error(timeValidationError.context.code as StatusCode, timeValidationError.message));
-		// 	return;
-		// }
+		const { error: timeValidationError, result: isTimeValid } = await AssessmentService.validateAssesmentTime(Assessment);
+		if (timeValidationError) {
+			responses.send(res, responses.error(timeValidationError.context.code as StatusCode, timeValidationError.message));
+			return;
+		}
 
 		const Question = AttemptDetail.Question;
 		const choices = Question?.choices;
@@ -145,7 +223,7 @@ export const updateAttemptDetail = async (req: Request, res: Response, next: Nex
 
 		if (answerId) {
 			let isValidAnswer = false;
-			let submission: Choice | undefined;
+			let submission: MCQChoice | CodingChoice | undefined;
 			for (const choice of choices || []) {
 				if (choice.id == answerId) {
 					isValidAnswer = true;
@@ -158,7 +236,14 @@ export const updateAttemptDetail = async (req: Request, res: Response, next: Nex
 				return;
 			}
 			const isCorrect = answerId == Question?.answer?.id;
-			const score = isCorrect ? Question.score || 0 : 0;
+			let score = 0;
+
+			if (Question?.type == "mcq") {
+				score = isCorrect ? Question.score : 0;
+			} else if (Question?.type == "coding") {
+				score = (submission as CodingChoice).score || 0;
+			}
+
 			attemptDetailUpdateFields = {
 				...attemptDetailUpdateFields,
 				isAttempted: true,
@@ -221,12 +306,6 @@ export const completeAssesment = async (req: Request, res: Response, next: NextF
 			return;
 		}
 
-		// const { error: timeValidationError, result: isTimeValid } = await AssessmentService.validateAssesmentTime(Assessment);
-		// if (timeValidationError) {
-		// 	responses.send(res, responses.error(timeValidationError.context.code as StatusCode, timeValidationError.message));
-		// 	return;
-		// }
-
 		const { error: getActiveAttemptErr, result: ActiveAttempt } = await AssessmentService.getActiveAttemptForAssessment(
 			Assessment,
 			Candidate
@@ -234,6 +313,14 @@ export const completeAssesment = async (req: Request, res: Response, next: NextF
 
 		if (getActiveAttemptErr) {
 			responses.send(res, responses.error(getActiveAttemptErr.context.code as StatusCode, getActiveAttemptErr.message));
+			return;
+		}
+
+		const isAssessmentCompleted = Boolean(ActiveAttempt.endTime);
+
+		const { error: timeValidationError, result: isTimeValid } = await AssessmentService.validateAssesmentTime(Assessment);
+		if (timeValidationError && isAssessmentCompleted) {
+			responses.send(res, responses.error(timeValidationError.context.code as StatusCode, timeValidationError.message));
 			return;
 		}
 
@@ -303,7 +390,7 @@ export const getActiveAttemptForAssessment = async (req: Request, res: Response,
 			where: {
 				AssessmentAttemptId: result.id
 			},
-			order: [["id", "ASC"]]
+			order: [["order", "ASC"]]
 		});
 		const payload = { ...result.dataValues } as Record<string, any>;
 		payload.Assessment = Assessment;

@@ -3,9 +3,15 @@ import appConfig from "$config/app";
 import sequelize from "$config/db";
 import logger from "$src/lib/logger";
 
-const server = app.listen(appConfig.port, () => {
-	logger.info(`[Process API] Server running on port ${appConfig.port}`);
-});
+const server = app.listen(
+	{
+		host: appConfig.host,
+		port: appConfig.port
+	},
+	() => {
+		logger.info(`[Process API] Server running on address ${appConfig.host}:${appConfig.port}`);
+	}
+);
 
 try {
 	await sequelize.sync({ alter: true });
