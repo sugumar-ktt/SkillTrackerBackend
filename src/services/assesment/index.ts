@@ -5,7 +5,6 @@ import logger from "$src/lib/logger";
 import { getRandRange } from "$src/lib/utils";
 import { models, type ModelInstances } from "$src/models";
 import type { QuestionTypeEnum } from "$src/models/question";
-import type { ProctoringInformation } from "$src/types";
 import dayjs from "dayjs";
 import { Op } from "sequelize";
 

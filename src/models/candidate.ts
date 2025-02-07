@@ -6,6 +6,7 @@ class Candidate extends Model<InferAttributes<Candidate>, InferCreationAttribute
 	declare id?: number;
 	declare firstName: string;
 	declare lastName: string;
+	declare password?: string;
 	declare email: string;
 	declare rollNumber: string;
 	declare CollegeId: number;
@@ -25,6 +26,7 @@ Candidate.init(
 		},
 		firstName: DataTypes.STRING,
 		lastName: DataTypes.STRING,
+		password: DataTypes.STRING,
 		email: {
 			type: DataTypes.STRING,
 			validate: { isEmail: true },

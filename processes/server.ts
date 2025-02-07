@@ -14,7 +14,7 @@ const server = app.listen(
 );
 
 try {
-	await sequelize.sync({ alter: true });
+	await sequelize.sync();
 	logger.info("[Sequelize] Database connected");
 } catch (error) {
 	if (error instanceof Error) {

@@ -7,6 +7,7 @@
 		"typecheck:watch": "tsc --noEmit --watch"
 	},
 	"devDependencies": {
+		"@types/argon2": "^0.15.4",
 		"@types/bun": "latest",
 		"@types/compression": "^1.7.5",
 		"@types/cookie-parser": "^1.4.8",
@@ -23,6 +24,7 @@
 	},
 	"dependencies": {
 		"@types/xlsx": "^0.0.36",
+		"argon2": "^0.41.1",
 		"compression": "^1.7.5",
 		"cookie-parser": "^1.4.7",
 		"cors": "^2.8.5",
