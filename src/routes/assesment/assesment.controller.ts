@@ -62,7 +62,10 @@ export const startAssessment = async (req: Request, res: Response, next: NextFun
 
 		const { error, result } = await AssessmentService.startAssesstment(assesmentId, session.id as number);
 		if (error) {
-			responses.send(res, responses.error(error.context.code as StatusCode, error.message));
+			responses.send(
+				res,
+				responses.error(error.context.code as StatusCode, error.message, { errorCode: error.context.meta?.errorCode })
+			);
 			return;
 		}
 		responses.send(res, responses.success(result.AssessmentAttempt, "Assessment started successfully"));

@@ -32,3 +32,7 @@ export type ProctoringInformation = {
 	fullScreenExits: number;
 	visibilityChanges: number;
 };
+
+export type AssessmentFlags = {
+	isLive: boolean;
+};

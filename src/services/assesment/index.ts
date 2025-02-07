@@ -19,12 +19,16 @@ export class AssessmentService {
 	static async startAssesstment(assesmentId: number, sessionId: number) {
 		try {
 			const Assessment = await models.Assessment.findOne({
-				attributes: ["id", "name", "startDate", "endDate", "questions", "questionDistribution"],
+				attributes: ["id", "name", "startDate", "endDate", "questions", "questionDistribution", "flags"],
 				where: { id: assesmentId }
 			});
 
 			if (!Assessment) {
 				throw AppError.notFound("Assessment not found");
+			}
+
+			if (Assessment.flags?.isLive == false) {
+				throw AppError.validation("Please wait. Your instructor will let you know when to start the assesment");
 			}
 
 			const startTime = dayjs(Assessment.startDate);
@@ -48,13 +52,16 @@ export class AssessmentService {
 				where: {
 					startTime: { [Op.gte]: startTime.toISOString() },
 					endTime: null as unknown as string,
-					status: { [Op.in]: ["Draft", "InProgress"] },
 					AssessmentId: Assessment.id,
 					CandidateId: Session.CandidateId
 				}
 			});
 			if (ExistingAssessmentAttempt) {
-				throw AppError.badRequest("Existing attempt for the test is in progress. Resume the session to proceed");
+				throw AppError.badRequest("Existing attempt for the test is in progress. Resume the session to proceed", {
+					meta: {
+						errorCode: "TEST_IN_PROGRESS"
+					}
+				});
 			}
 
 			const { AssessmentAttempt, AssessmentAttemptDetails } = await sequelize.transaction(async (t) => {
@@ -205,7 +212,8 @@ export class AssessmentService {
 					status: { [Op.in]: ["Draft", "InProgress"] },
 					AssessmentId: assesment.id,
 					CandidateId: candidate.id
-				}
+				},
+				order: [["createdAt", "DESC"]]
 			});
 			if (!ActiveAssessmentAttempt) {
 				throw AppError.notFound("No active attempts found for the assesment");
@@ -350,7 +358,7 @@ export class AssessmentService {
 			const fullScreenExits = proctoring.fullScreenExits || 0;
 			if (!proctoring.isAssessmentConsentProvided) {
 				integrity = AssessmentIntegrity.PermissionDeclined;
-			} else if (proctoring.isFullScreenAccessProvided == false || visibilityChanges >= 10 || fullScreenExits >= 10) {
+			} else if (proctoring.isFullScreenAccessProvided == false || visibilityChanges >= 6 || fullScreenExits >= 3) {
 				integrity = AssessmentIntegrity.Bad;
 			} else {
 				integrity = AssessmentIntegrity.Good;

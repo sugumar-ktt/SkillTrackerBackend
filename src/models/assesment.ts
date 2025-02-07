@@ -2,6 +2,7 @@ import sequelize from "$config/db";
 import { DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
 import type { QuestionTypeEnum } from "./question";
 import type { Models } from "./types";
+import type { AssessmentFlags } from "$src/types";
 
 export type QuestionDistribution = {
 	[key in QuestionTypeEnum]: number;
@@ -16,6 +17,8 @@ class Assessment extends Model<InferAttributes<Assessment>, InferCreationAttribu
 	declare questions?: number;
 	declare CollegeId: number;
 	declare questionDistribution: Partial<QuestionDistribution>;
+	declare flags?: AssessmentFlags;
+
 	static associate(models: Models) {
 		Assessment.belongsTo(models.College, { foreignKey: { field: "CollegeId" } });
 		Assessment.hasMany(models.Candidate);
@@ -43,6 +46,10 @@ Assessment.init(
 		questionDistribution: {
 			type: DataTypes.JSONB,
 			defaultValue: {} as QuestionDistribution
+		},
+		flags: {
+			type: DataTypes.JSONB,
+			defaultValue: {} as AssessmentFlags
 		},
 		maxAttempts: {
 			type: DataTypes.INTEGER,

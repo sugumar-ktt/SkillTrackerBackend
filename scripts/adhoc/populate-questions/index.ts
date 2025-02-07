@@ -30,7 +30,7 @@ const normalizeTrailingSpaces = (val: string | undefined) => {
 	return val.trim();
 };
 
-const sheets = ["MCQs", "Programming"];
+const sheets = ["MCQ", "Programming"];
 
 sequelize.sync({ alter: true }).then(async () => {
 	let totalRows = 0;
@@ -71,8 +71,6 @@ sequelize.sync({ alter: true }).then(async () => {
 			} else if (question.type == "mcq") {
 				const answer = parseInt(row["Answer"] ?? "") - 1;
 
-				console.log(answer, isFinite(answer));
-
 				if (!isFinite(answer)) {
 					skippedRows.push({ index: index, reason: `No answer provided for MCQ` });
 					continue;
@@ -89,7 +87,7 @@ sequelize.sync({ alter: true }).then(async () => {
 
 				question.choices = choices.map((c) => ({
 					id: Bun.randomUUIDv7(),
-					text: normalizeTrailingSpaces(c)
+					text: normalizeTrailingSpaces(String(c))
 				}));
 				question.score = QUESTION_SCORE_BY_TYPE.mcq;
 				question.answer = question.choices[answer];
@@ -104,7 +102,7 @@ sequelize.sync({ alter: true }).then(async () => {
 			const Questions = await models.Question.bulkCreate(questions, { validate: true, transaction: t });
 			insertedRows += Questions.length;
 		} catch (error) {
-			logger.error("Error while creating question records", error);
+			logger.error(error), "Error while creating question records";
 		}
 	});
 

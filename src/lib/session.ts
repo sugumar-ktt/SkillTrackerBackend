@@ -62,11 +62,13 @@ export async function invalidateSession(sessionId: string): Promise<ResultType<b
 		if (!Session) {
 			return { error: new Error("Session not found") };
 		}
-		await Session.destroy();
+		await Session.update({
+			expiresAt: dayjs().toISOString()
+		});
 		return { result: true };
 	} catch (error) {
 		const normalizedError = error instanceof Error ? error : new Error(String(error));
-		logger.error("Error invalidating session", error);
+		logger.error(error, "Error invalidating session");
 		return { error: new Error("Error invalidating session", { cause: normalizedError }) };
 	}
 }
